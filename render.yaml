@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: hootswing-whatsapp-bot
+    runtime: node
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+    disk:
+      name: whatsapp-session
+      mountPath: /opt/render/project/src/sesion
+      sizeGB: 1
