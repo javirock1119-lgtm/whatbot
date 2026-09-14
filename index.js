@@ -73,11 +73,10 @@ const curiosidadesTimers = new Map();
 
 function obtenerTotalPedido(orden) {
   const cantidades = (orden.match(/\b(?:6|12)\b/g) || []).map(Number);
-  const totalAlitas = cantidades.reduce((total, cantidad) => total + cantidad, 0);
-  const ordenesDe12 = Math.floor(totalAlitas / 12);
-  const alitasRestantes = totalAlitas % 12;
-
-  return ordenesDe12 * 310 + (alitasRestantes === 6 ? 190 : 0);
+  return cantidades.reduce(
+    (total, cantidad) => total + (cantidad === 12 ? 310 : 190),
+    0
+  );
 }
 
 async function obtenerLockDeArranque() {
