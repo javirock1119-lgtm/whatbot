@@ -73,12 +73,21 @@ const curiosidadesTimers = new Map();
 
 function obtenerTotalPedido(orden) {
   const textoOrden = orden.toLowerCase();
-  const ordenesDeSeis =
-    (textoOrden.match(/\b6\b/g) || []).length +
-    (textoOrden.match(/\bsix\b/g) || []).length;
-  const ordenesDeDoce =
-    (textoOrden.match(/\b12\b/g) || []).length +
-    (textoOrden.match(/\bbig\b/g) || []).length;
+  const combosSix = (textoOrden.match(/\bcombo\s+six\b/g) || []).length;
+  const combosBig = (textoOrden.match(/\bcombo\s+big\b/g) || []).length;
+
+  if (combosSix > 0 || combosBig > 0) {
+    return combosSix * 190 + combosBig * 310;
+  }
+
+  const nombresSix = (textoOrden.match(/\bsix\b/g) || []).length;
+  const nombresBig = (textoOrden.match(/\bbig\b/g) || []).length;
+  if (nombresSix > 0 || nombresBig > 0) {
+    return nombresSix * 190 + nombresBig * 310;
+  }
+
+  const ordenesDeSeis = (textoOrden.match(/\b6\b/g) || []).length;
+  const ordenesDeDoce = (textoOrden.match(/\b12\b/g) || []).length;
 
   return ordenesDeSeis * 190 + ordenesDeDoce * 310;
 }
