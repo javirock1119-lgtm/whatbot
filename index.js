@@ -1,13 +1,24 @@
+import express from 'express';
 import fs from "fs";
 import path from "path";
-import express from "express";
 import makeWASocket, {
-  Browsers,
-  DisconnectReason,
-  useMultiFileAuthState
+    Browsers,
+    DisconnectReason,
+    useMultiFileAuthState
 } from "@whiskeysockets/baileys";
 import qrcode from "qrcode-terminal";
 import pino from "pino";
+
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+  res.send('Bot de WhatsApp activo 24/7');
+});
+
+app.listen(port, () => {
+  console.log(`Servidor HTTP corriendo en el puerto ${port}`);
+});
 
 const logger = pino({ level: "silent" });
 const AUTH_PATH = path.join(process.cwd(), "sesion");
