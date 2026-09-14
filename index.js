@@ -72,7 +72,12 @@ const curiosidades = [
 const curiosidadesTimers = new Map();
 
 function obtenerTotalPedido(orden) {
-  return /\b12\b/.test(orden) ? 310 : 190;
+  const cantidades = [...orden.matchAll(/\b(6|12)\b/g)].map(([, cantidad]) => Number(cantidad));
+  const totalAlitas = cantidades.reduce((total, cantidad) => total + cantidad, 0);
+  const ordenesDe12 = Math.floor(totalAlitas / 12);
+  const alitasRestantes = totalAlitas % 12;
+
+  return ordenesDe12 * 310 + (alitasRestantes === 6 ? 190 : 0);
 }
 
 async function obtenerLockDeArranque() {
@@ -428,7 +433,7 @@ async function iniciarBot() {
         text: [
           "¡Perfecto! Revisa tus datos:",
           `Orden: ${pedido.orden}`,
-          `Total: ${obtenerTotalPedido(pedido.orden)} LPS`,
+          `Total del pedido: ${obtenerTotalPedido(pedido.orden)} LPS`,
           `Salsa: ${pedido.salsa}`,
           `Nombre: ${pedido.nombre}`,
           `Dirección: ${texto.trim()}`,
@@ -447,7 +452,7 @@ async function iniciarBot() {
           text: [
             "¡Pedido confirmado! ✅",
             `Orden: ${pedido.orden}`,
-            `Total: ${obtenerTotalPedido(pedido.orden)} LPS`,
+            `Total del pedido: ${obtenerTotalPedido(pedido.orden)} LPS`,
             `Salsa: ${pedido.salsa}`,
             `Nombre: ${pedido.nombre}`,
             `Dirección: ${pedido.direccion}`,
