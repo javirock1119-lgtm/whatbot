@@ -71,6 +71,10 @@ const curiosidades = [
 ];
 const curiosidadesTimers = new Map();
 
+function obtenerTotalPedido(orden) {
+  return /\b12\b/.test(orden) ? 310 : 190;
+}
+
 async function obtenerLockDeArranque() {
   const intentarCrearLock = async () => {
     const fd = await fs.promises.open(LOCK_PATH, "wx");
@@ -424,6 +428,7 @@ async function iniciarBot() {
         text: [
           "¡Perfecto! Revisa tus datos:",
           `Orden: ${pedido.orden}`,
+          `Total: ${obtenerTotalPedido(pedido.orden)} LPS`,
           `Salsa: ${pedido.salsa}`,
           `Nombre: ${pedido.nombre}`,
           `Dirección: ${texto.trim()}`,
@@ -442,11 +447,12 @@ async function iniciarBot() {
           text: [
             "¡Pedido confirmado! ✅",
             `Orden: ${pedido.orden}`,
+            `Total: ${obtenerTotalPedido(pedido.orden)} LPS`,
             `Salsa: ${pedido.salsa}`,
             `Nombre: ${pedido.nombre}`,
             `Dirección: ${pedido.direccion}`,
             "",
-            "Un agente confirmará los detalles y el total.",
+            "Un agente confirmará los detalles del pedido.",
             "",
             `¡Gracias por tu pedido, ${pedido.nombre}!`,
             "Somos Hootswing, desde las cocinas más legendarias del planeta. 🌎🍗"
@@ -582,8 +588,7 @@ async function iniciarBot() {
           "1. Orden de 6 o 12 alitas.",
           "2. Puedes elegir una salsa o combinar: por ejemplo, *6 buffalo y 6 barbacoa*.",
           "3. Acompañamiento.",
-          "4. Indica si recogerás tu pedido o necesitas envío a domicilio.",
-          "",
+          
           "Para comenzar, escribe *6 alitas* o *12 alitas*. También puedes indicar varias salsas."
         ].join("\n")
       });
