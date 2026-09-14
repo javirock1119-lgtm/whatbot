@@ -72,24 +72,21 @@ const curiosidades = [
 const curiosidadesTimers = new Map();
 
 function obtenerTotalPedido(orden) {
-  const textoOrden = orden.toLowerCase();
-  const combosSix = (textoOrden.match(/\bcombo\s+six\b/g) || []).length;
-  const combosBig = (textoOrden.match(/\bcombo\s+big\b/g) || []).length;
+  const textoOrden = orden.toLowerCase().replace(/\s+/g, " ");
+  const combos = textoOrden.match(/\bcombo\s+(six|big)\b/g) || [];
 
-  if (combosSix > 0 || combosBig > 0) {
-    return combosSix * 190 + combosBig * 310;
+  if (combos.length > 0) {
+    return combos.reduce(
+      (total, combo) => total + (combo.endsWith("big") ? 310 : 190),
+      0
+    );
   }
 
-  const nombresSix = (textoOrden.match(/\bsix\b/g) || []).length;
-  const nombresBig = (textoOrden.match(/\bbig\b/g) || []).length;
-  if (nombresSix > 0 || nombresBig > 0) {
-    return nombresSix * 190 + nombresBig * 310;
-  }
-
-  const ordenesDeSeis = (textoOrden.match(/\b6\b/g) || []).length;
-  const ordenesDeDoce = (textoOrden.match(/\b12\b/g) || []).length;
-
-  return ordenesDeSeis * 190 + ordenesDeDoce * 310;
+  const cantidades = textoOrden.match(/\b(6|12)\b/g) || [];
+  return cantidades.reduce(
+    (total, cantidad) => total + (cantidad === "12" ? 310 : 190),
+    0
+  );
 }
 
 async function obtenerLockDeArranque() {
