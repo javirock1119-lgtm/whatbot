@@ -72,8 +72,13 @@ const curiosidades = [
 const curiosidadesTimers = new Map();
 
 function obtenerTotalPedido(orden) {
-  const ordenesDeSeis = (orden.match(/\b6\b/g) || []).length;
-  const ordenesDeDoce = (orden.match(/\b12\b/g) || []).length;
+  const textoOrden = orden.toLowerCase();
+  const ordenesDeSeis =
+    (textoOrden.match(/\b6\b/g) || []).length +
+    (textoOrden.match(/\bsix\b/g) || []).length;
+  const ordenesDeDoce =
+    (textoOrden.match(/\b12\b/g) || []).length +
+    (textoOrden.match(/\bbig\b/g) || []).length;
 
   return ordenesDeSeis * 190 + ordenesDeDoce * 310;
 }
@@ -325,8 +330,8 @@ async function iniciarBot() {
           "",
           "*MENÚ - HOOTSWING COCINAS LEGENDARIAS* 🍗",
           "",
-          "🍗 Orden de 6 alitas - 190 LPS",
-          "🍗 Orden de 12 alitas - 310 LPS",
+          "🍗 Combo Six: 6 alitas, papas y aderezo - 190 LPS",
+          "🍗 Combo Big: 12 alitas, papas y aderezo - 310 LPS",
           "",
           "Salsas: barbacoa y buffalo.",
           "Acompañamientos: papas, aderezos.",
@@ -341,11 +346,11 @@ async function iniciarBot() {
 
     if (pedido?.estado === "orden" && texto.trim()) {
       const orden = texto.trim();
-      const tieneOrdenValida = /\b(6|12)\b/.test(orden);
+      const tieneOrdenValida = /\b(6|12|six|big)\b/i.test(orden);
 
       if (!tieneOrdenValida) {
         await sock.sendMessage(chatId, {
-          text: "Indica una orden válida: *6 alitas* o *12 alitas*."
+          text: "Indica un combo válido: *Combo Six* o *Combo Big*."
         });
         return;
       }
@@ -544,8 +549,8 @@ async function iniciarBot() {
       const menuText = [
         "*MENÚ - HOOTSWING COCINAS LEGENDARIAS* 🍗",
         "",
-        "🍗 Orden de 6 alitas - 190 LPS",
-        "🍗 Orden de 12 alitas - 310 LPS",
+        "🍗 Combo Six: 6 alitas, papas y aderezo - 190 LPS",
+        "🍗 Combo Big: 12 alitas, papas y aderezo - 310 LPS",
         "",
         "Salsas: barbacoa y buffalo.",
         "Acompañamientos: papas, aderezos.",
@@ -594,11 +599,11 @@ async function iniciarBot() {
       await sock.sendMessage(chatId, {
         text: [
           "¡Claro! Para hacer tu pedido, envía:",
-          "1. Orden de 6 o 12 alitas.",
+          "1. Elige Combo Six o Combo Big.",
           "2. Puedes elegir una salsa o combinar: por ejemplo, *6 buffalo y 6 barbacoa*.",
-          "3. Acompañamiento.",
+          "3. Acompañamiento papas aderezo.",
           
-          "Para comenzar, escribe *6 alitas* o *12 alitas*. También puedes indicar varias salsas."
+          "Para comenzar, escribe *Combo Six* o *Combo Big*. También puedes indicar varias salsas."
         ].join("\n")
       });
       return;
@@ -606,7 +611,7 @@ async function iniciarBot() {
 
     if (comando) {
       await sock.sendMessage(chatId, {
-        text: "¡Bienvenido a *Hootswing Cocinas Legendarias*! 🍗 Escribe *menu* para ver las órdenes de 6 y 12 alitas, o *ayuda* para hacer tu pedido."
+        text: "¡Bienvenido a *Hootswing Cocinas Legendarias*! 🍗 Escribe *menu* para ver Combo Six y Combo Big, o *ayuda* para hacer tu pedido."
       });
     }
   }
