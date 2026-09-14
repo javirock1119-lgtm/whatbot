@@ -400,3 +400,15 @@ iniciarBot().catch((error) => {
   console.error("No se pudo iniciar el bot:", error);
   process.exitCode = 1;
 });
+const PORT = process.env.PORT || 3000;
+const express = require('express');
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+  res.send('El bot de WhatsApp está vivo y corriendo 24/7');
+});
+
+app.listen(PORT, () => {
+  console.log(`Servidor web escuchando en el puerto ${PORT}`);
+});
