@@ -403,7 +403,8 @@ iniciarBot().catch((error) => {
 const PORT = process.env.PORT || 3000;
 const express = require('express');
 const app = express();
-const PORT = process.env.PORT || 3000;
+
+
 
 app.get('/', (req, res) => {
   res.send('El bot de WhatsApp está vivo y corriendo 24/7');
