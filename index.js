@@ -7,13 +7,23 @@ import makeWASocket, {
     useMultiFileAuthState
 } from "@whiskeysockets/baileys";
 import qrcode from "qrcode-terminal";
+import QRCode from "qrcode";
 import pino from "pino";
 
 const app = express();
 const port = process.env.PORT || 3000;
+const qrImagePath = path.join(process.cwd(), "qr.png");
 
 app.get('/', (req, res) => {
   res.send('Bot de WhatsApp activo 24/7');
+});
+
+app.get("/qr.png", (req, res) => {
+  res.sendFile(qrImagePath, (error) => {
+    if (error && !res.headersSent) {
+      res.status(error.code === "ENOENT" ? 404 : 500).send("QR no disponible");
+    }
+  });
 });
 
 app.listen(port, () => {
@@ -22,9 +32,91 @@ app.listen(port, () => {
 
 const logger = pino({ level: "silent" });
 const AUTH_PATH = path.join(process.cwd(), "sesion");
+const LOCK_PATH = path.join(process.cwd(), ".bot.lock");
 let socketActivo;
 let reconexionProgramada = false;
+let lockAdquiridoPorEsteProceso = false;
 const pedidosEnCurso = new Map();
+const curiosidades = [
+  "🌌 La luz del Sol tarda aproximadamente 8 minutos y 20 segundos en llegar a la Tierra.",
+  "🧠 El cerebro humano utiliza cerca del 20% de la energía del cuerpo, aunque representa aproximadamente el 2% de su peso.",
+  "🐙 Los pulpos tienen tres corazones y su sangre es azul debido a una proteína llamada hemocianina.",
+  "🌳 Los árboles se comunican y pueden intercambiar nutrientes mediante redes de hongos conectadas a sus raíces.",
+  "⚡ Un relámpago puede calentar el aire a temperaturas varias veces superiores a la superficie del Sol durante un instante.",
+  "🛰️ Los satélites GPS necesitan corregir los efectos de la relatividad para calcular posiciones con precisión.",
+  "🦋 Las mariposas prueban los sabores usando receptores ubicados en sus patas.",
+  "📚 La Biblioteca de Alejandría fue uno de los centros de conocimiento más importantes del mundo antiguo.",
+  "🌍 La Tierra no es una esfera perfecta: gira ligeramente ensanchada en el ecuador debido a su rotación.",
+  "💧 El agua puede existir como sólido, líquido y gas, y sus propiedades hacen posible gran parte de la vida en la Tierra.",
+  "🔬 Los antibióticos combaten bacterias, pero no son eficaces contra virus como los que causan la gripe o el resfriado.",
+  "🧬 Casi todas las células humanas contienen el mismo ADN, pero activan diferentes genes según su función.",
+  "🎼 El oído humano puede distinguir diferencias muy pequeñas de tono, lo que permite reconocer voces e instrumentos.",
+  "🏛️ Muchas palabras del español proceden del latín, el árabe y las lenguas originarias de América.",
+  "🤖 La inteligencia artificial aprende patrones a partir de datos; no piensa ni comprende exactamente como una persona.",
+  "🌱 Las plantas convierten la luz solar en energía química mediante la fotosíntesis y liberan oxígeno como parte del proceso.",
+  "🕰️ Un año en Venus dura menos que un día en Venus: tarda más en girar sobre sí mismo que en completar su órbita.",
+  "🐝 Las abejas pueden comunicar la ubicación de alimento mediante una danza que indica dirección y distancia.",
+  "📐 El número cero fue desarrollado de manera independiente en distintas culturas y transformó las matemáticas.",
+  "🌊 El sonido viaja más rápido en el agua que en el aire porque las partículas están más juntas.",
+  "☀️ La energía del Sol se produce mediante fusión nuclear, uniendo núcleos de hidrógeno para formar helio.",
+  "🧭 Las brújulas apuntan aproximadamente al norte magnético, que no coincide exactamente con el norte geográfico.",
+  "🦴 Los huesos son tejidos vivos: se reparan, se remodelan y almacenan minerales como calcio y fósforo.",
+  "🌐 Internet es una red global de redes; la información viaja dividida en pequeños paquetes que luego se vuelven a reunir.",
+  "🪐 Saturno tiene una densidad media menor que la del agua, aunque necesitaríamos una bañera gigantesca para comprobarlo.",
+  "🌋 La mayor parte de la actividad volcánica de la Tierra ocurre bajo los océanos, lejos de nuestra vista.",
+  "🧊 El hielo flota porque el agua se expande al congelarse y se vuelve menos densa.",
+  "🦇 Los murciélagos son los únicos mamíferos capaces de realizar un vuelo verdaderamente sostenido.",
+  "🔭 La luz que vemos de algunas estrellas salió de ellas hace miles o millones de años.",
+  "🧩 Resolver problemas nuevos suele ser más fácil cuando se divide una tarea grande en pasos pequeños y verificables."
+];
+const curiosidadesTimers = new Map();
+
+async function obtenerLockDeArranque() {
+  const intentarCrearLock = async () => {
+    const fd = await fs.promises.open(LOCK_PATH, "wx");
+    await fd.writeFile(String(process.pid));
+    await fd.close();
+    return true;
+  };
+
+  try {
+    return await intentarCrearLock();
+  } catch (error) {
+    if (error?.code !== "EEXIST") {
+      throw error;
+    }
+
+    try {
+      const contenido = await fs.promises.readFile(LOCK_PATH, "utf8");
+      const pidAnterior = Number.parseInt(contenido.trim(), 10);
+      if (!Number.isNaN(pidAnterior)) {
+        try {
+          process.kill(pidAnterior, 0);
+          return false;
+        } catch (killError) {
+          if (killError && killError.code === "ESRCH") {
+            await fs.promises.rm(LOCK_PATH, { force: true });
+            return await intentarCrearLock();
+          }
+          return false;
+        }
+      }
+    } catch (readError) {
+      console.warn("No se pudo leer el lock, intentando limpiar:", readError);
+    }
+
+    await fs.promises.rm(LOCK_PATH, { force: true });
+    return await intentarCrearLock();
+  }
+}
+
+async function liberarLockDeArranque() {
+  try {
+    await fs.promises.rm(LOCK_PATH, { force: true });
+  } catch (error) {
+    console.error("No se pudo liberar el bloqueo de arranque:", error);
+  }
+}
 
 async function limpiarSesionCorrupta() {
   try {
@@ -36,6 +128,32 @@ async function limpiarSesionCorrupta() {
 }
 
 async function iniciarBot() {
+  await fs.promises.mkdir(AUTH_PATH, { recursive: true });
+
+  if (socketActivo && socketActivo.ws?.readyState === 1) {
+    console.log("El bot ya está conectado; no se reinicia otra instancia.");
+    return;
+  }
+
+  if (!lockAdquiridoPorEsteProceso) {
+    const lockAdquirido = await obtenerLockDeArranque();
+    if (!lockAdquirido) {
+      console.error("Otra instancia del bot ya está activa. Cierra la otra ventana o proceso antes de iniciar otra copia.");
+      process.exit(1);
+    }
+    lockAdquiridoPorEsteProceso = true;
+
+    process.on("exit", () => {
+      liberarLockDeArranque();
+    });
+    process.on("SIGINT", () => {
+      liberarLockDeArranque().finally(() => process.exit(0));
+    });
+    process.on("SIGTERM", () => {
+      liberarLockDeArranque().finally(() => process.exit(0));
+    });
+  }
+
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_PATH);
 
   const sock = makeWASocket({
@@ -58,12 +176,21 @@ async function iniciarBot() {
     });
 
     if (qr) {
-      console.log("\nEscanea este código QR desde WhatsApp:");
+      await QRCode.toFile(qrImagePath, qr, {
+        type: "png",
+        width: 720,
+        margin: 4,
+        errorCorrectionLevel: "M"
+      });
+      console.log("\nEscanea el QR desde esta imagen:");
+      console.log(`http://localhost:${port}/qr.png`);
       qrcode.generate(qr, { small: true });
       console.log("El código QR caduca rápidamente; si falla, espera uno nuevo.");
     }
 
     if (connection === "open") {
+      reconexionProgramada = false;
+      await fs.promises.rm(qrImagePath, { force: true });
       sock.sendPresenceUpdate({ presence: "available" }).catch(() => {});
       console.log(
         "Bot conectado correctamente como:",
@@ -82,13 +209,16 @@ async function iniciarBot() {
       const errorMessage = lastDisconnect?.error?.message || "motivo desconocido";
       const esSesionCorrupta =
         codigo === DisconnectReason.badSession ||
+        codigo === DisconnectReason.connectionReplaced ||
+        codigo === 440 ||
         errorMessage.includes("MessageCounterError") ||
         errorMessage.includes("Failed to decrypt message with any known session") ||
+        errorMessage.includes("Stream Errored (conflict)") ||
         errorMessage.includes("session");
       const debeReconectar = codigo !== DisconnectReason.loggedOut;
 
       if (esSesionCorrupta) {
-        console.error("Sesión corrupta detectada:", errorMessage, `(código ${codigo ?? "desconocido"})`);
+        console.error("Sesión conflictiva o corrupta detectada:", errorMessage, `(código ${codigo ?? "desconocido"})`);
         await limpiarSesionCorrupta();
       }
 
@@ -99,6 +229,9 @@ async function iniciarBot() {
           errorMessage,
           `(código ${codigo ?? "desconocido"})`
         );
+        if (codigo === 440 || errorMessage.includes("Stream Errored (conflict)")) {
+          console.log("Se detectó conflicto de sesión. Se limpiará la sesión y se pedirá QR nuevo en la próxima conexión.");
+        }
         console.log("Conexión cerrada. Reconectando en 3 segundos...");
         setTimeout(() => {
           reconexionProgramada = false;
@@ -113,6 +246,30 @@ async function iniciarBot() {
   });
 
   const mensajesProcesados = new Set();
+
+  function enviarCuriosidadAleatoria(chatId, nombreCliente) {
+    const curiosidad = curiosidades[Math.floor(Math.random() * curiosidades.length)];
+    sock.sendMessage(chatId, {
+      text: [
+        `💡 Aquí tienes un dato curioso mientras se cocina tu pedido, ${nombreCliente || "amigo"}:`,
+        "",
+        curiosidad
+      ].join("\n")
+    }).catch(() => {});
+  }
+
+  function iniciarCuriosidadesAutomatica(chatId, nombreCliente) {
+    if (curiosidadesTimers.has(chatId)) {
+      clearTimeout(curiosidadesTimers.get(chatId));
+    }
+
+    const timer = setTimeout(() => {
+      enviarCuriosidadAleatoria(chatId, nombreCliente);
+      curiosidadesTimers.delete(chatId);
+    }, 3 * 60 * 1000);
+
+    curiosidadesTimers.set(chatId, timer);
+  }
 
   async function procesarMensaje(mensaje) {
     if (!mensaje?.message) {
@@ -150,6 +307,11 @@ async function iniciarBot() {
 
     if (comando === "salir") {
       pedidosEnCurso.delete(chatId);
+      const timer = curiosidadesTimers.get(chatId);
+      if (timer) {
+        clearTimeout(timer);
+        curiosidadesTimers.delete(chatId);
+      }
       await sock.sendMessage(chatId, {
         text: [
           "Has salido del pedido.",
@@ -290,6 +452,9 @@ async function iniciarBot() {
             "Somos Hootswing, desde las cocinas más legendarias del planeta. 🌎🍗"
           ].join("\n")
         });
+
+        iniciarCuriosidadesAutomatica(chatId, pedido.nombre);
+
         setTimeout(async () => {
           const rutaImagen = [
             path.join(process.cwd(), "img", "pedido.jpg"),
@@ -337,6 +502,11 @@ async function iniciarBot() {
         }, 2 * 60 * 1000);
       } else if (comando === "no") {
         pedidosEnCurso.delete(chatId);
+        const timer = curiosidadesTimers.get(chatId);
+        if (timer) {
+          clearTimeout(timer);
+          curiosidadesTimers.delete(chatId);
+        }
         await sock.sendMessage(chatId, {
           text: "Pedido cancelado. Escribe *pedido listo* cuando quieras comenzar de nuevo."
         });
@@ -428,9 +598,9 @@ async function iniciarBot() {
   }
 
   sock.ev.on("messages.upsert", ({ messages, type }) => {
-    // "append" contiene mensajes históricos/sincronizados y puede llegar tarde.
-    // Solo "notify" corresponde a mensajes nuevos recibidos en tiempo real.
-    if (type !== "notify") return;
+    // En WhatsApp no siempre llega como "notify"; a veces entra como "append".
+    // Procesamos ambos tipos para no perder mensajes nuevos o históricos relevantes.
+    if (type && !["notify", "append"].includes(type)) return;
 
     for (const mensaje of messages) {
       const mensajeKey = `${mensaje?.key?.remoteJid ?? "sin-chat"}:${mensaje?.key?.id ?? "sin-id"}`;
@@ -449,17 +619,6 @@ async function iniciarBot() {
     }
   });
 }
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.get("/", (req, res) => {
-  res.send("El bot de WhatsApp está vivo y corriendo 24/7");
-});
-
-app.listen(PORT, () => {
-  console.log(`Servidor web escuchando en el puerto ${PORT}`);
-});
 
 iniciarBot().catch((error) => {
   console.error("No se pudo iniciar el bot:", error);
