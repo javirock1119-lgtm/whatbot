@@ -72,7 +72,7 @@ const curiosidades = [
 const curiosidadesTimers = new Map();
 
 function obtenerTotalPedido(orden) {
-  const cantidades = [...orden.matchAll(/\b(6|12)\b/g)].map(([, cantidad]) => Number(cantidad));
+  const cantidades = (orden.match(/\b(?:6|12)\b/g) || []).map(Number);
   const totalAlitas = cantidades.reduce((total, cantidad) => total + cantidad, 0);
   const ordenesDe12 = Math.floor(totalAlitas / 12);
   const alitasRestantes = totalAlitas % 12;
@@ -352,6 +352,7 @@ async function iniciarBot() {
         return;
       }
 
+      const total = obtenerTotalPedido(orden);
       const salsasEnOrden = [];
       if (orden.toLowerCase().includes("barbacoa")) {
         salsasEnOrden.push("barbacoa");
@@ -364,6 +365,7 @@ async function iniciarBot() {
         pedidosEnCurso.set(chatId, {
           estado: "nombre",
           orden,
+          total,
           salsa: salsasEnOrden.join(" y ")
         });
         await sock.sendMessage(chatId, {
@@ -374,7 +376,8 @@ async function iniciarBot() {
 
       pedidosEnCurso.set(chatId, {
         estado: "salsa",
-        orden
+        orden,
+        total
       });
       await sock.sendMessage(chatId, {
         text: "¿Qué salsa deseas? Responde *barbacoa* o *buffalo*."
@@ -400,6 +403,7 @@ async function iniciarBot() {
       pedidosEnCurso.set(chatId, {
         estado: "nombre",
         orden: pedido.orden,
+        total: pedido.total,
         salsa: salsaElegida
       });
       await sock.sendMessage(chatId, {
@@ -412,6 +416,7 @@ async function iniciarBot() {
       pedidosEnCurso.set(chatId, {
         estado: "direccion",
         orden: pedido.orden,
+        total: pedido.total,
         salsa: pedido.salsa,
         nombre: texto.trim()
       });
@@ -425,6 +430,7 @@ async function iniciarBot() {
       pedidosEnCurso.set(chatId, {
         estado: "confirmacion",
         orden: pedido.orden,
+        total: pedido.total,
         salsa: pedido.salsa,
         nombre: pedido.nombre,
         direccion: texto.trim()
@@ -433,7 +439,7 @@ async function iniciarBot() {
         text: [
           "¡Perfecto! Revisa tus datos:",
           `Orden: ${pedido.orden}`,
-          `Total del pedido: ${obtenerTotalPedido(pedido.orden)} LPS`,
+          `Total del pedido: ${pedido.total ?? obtenerTotalPedido(pedido.orden)} LPS`,
           `Salsa: ${pedido.salsa}`,
           `Nombre: ${pedido.nombre}`,
           `Dirección: ${texto.trim()}`,
@@ -452,7 +458,7 @@ async function iniciarBot() {
           text: [
             "¡Pedido confirmado! ✅",
             `Orden: ${pedido.orden}`,
-            `Total del pedido: ${obtenerTotalPedido(pedido.orden)} LPS`,
+            `Total del pedido: ${pedido.total ?? obtenerTotalPedido(pedido.orden)} LPS`,
             `Salsa: ${pedido.salsa}`,
             `Nombre: ${pedido.nombre}`,
             `Dirección: ${pedido.direccion}`,
