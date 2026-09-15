@@ -332,6 +332,64 @@ async function iniciarBot() {
     console.log(`Dato curioso programado para ${chatId} dentro de 3 minutos.`);
   }
 
+  async function enviarSelectorSalsa(chatId) {
+    await sock.sendMessage(chatId, {
+      title: "Elige tu salsa",
+      text: "Selecciona una salsa para continuar:",
+      footer: "Puedes cambiar de opción escribiendo el nombre.",
+      buttonText: "Ver salsas",
+      sections: [
+        {
+          title: "Salsas disponibles",
+          rows: [
+            {
+              title: "Barbacoa",
+              description: "Sabor ahumado y dulce",
+              rowId: "salsa_barbacoa"
+            },
+            {
+              title: "Buffalo",
+              description: "Sabor picante y clásico",
+              rowId: "salsa_buffalo"
+            }
+          ]
+        }
+      ]
+    });
+  }
+
+  async function enviarConfirmacionPedido(chatId, pedido, direccion) {
+    await sock.sendMessage(chatId, {
+      text: [
+        "🧾 *Revisa tu pedido*",
+        "",
+        pedido.resumen,
+        `🌶️ Salsa: ${pedido.salsa}`,
+        `👤 Nombre: ${pedido.nombre}`,
+        `📍 Dirección: ${direccion}`,
+        "",
+        "¿Deseas confirmar tu pedido?"
+      ].join("\n")
+    });
+    await sock.sendMessage(chatId, {
+      text: "Elige una opción:",
+      footer: "Hootswing Cocinas Legendarias",
+      buttons: [
+        {
+          buttonId: "confirmar_pedido",
+          buttonText: { displayText: "✅ Confirmar pedido" },
+          type: 1
+        },
+        {
+          buttonId: "cancelar_pedido",
+          buttonText: { displayText: "❌ Cancelar" },
+          type: 1
+        }
+      ],
+      headerType: 1
+    });
+  }
+
   async function procesarMensaje(mensaje) {
     if (!mensaje?.message) {
       console.log("Mensaje sin contenido.");
@@ -369,6 +427,10 @@ async function iniciarBot() {
     const texto = {
       orden_6: "6 alitas",
       orden_12: "12 alitas",
+      salsa_barbacoa: "barbacoa",
+      salsa_buffalo: "buffalo",
+      confirmar_pedido: "si",
+      cancelar_pedido: "no",
       ver_info: "info",
       iniciar_pedido: "ayuda"
     }[textoRecibido.trim().toLowerCase()] || textoRecibido;
@@ -443,9 +505,7 @@ async function iniciarBot() {
         total,
         resumen
       });
-      await sock.sendMessage(chatId, {
-        text: "¿Qué salsa deseas? Responde *barbacoa* o *buffalo*."
-      });
+      await enviarSelectorSalsa(chatId);
       return;
     }
 
@@ -502,18 +562,7 @@ async function iniciarBot() {
         nombre: pedido.nombre,
         direccion: texto.trim()
       });
-      await sock.sendMessage(chatId, {
-        text: [
-          "¡Perfecto! Revisa tus datos:",
-          pedido.resumen,
-          `Salsa: ${pedido.salsa}`,
-          `Nombre: ${pedido.nombre}`,
-          `Dirección: ${texto.trim()}`,
-          "",
-          "¿Deseas confirmar tu pedido?",
-          "Responde *si* para confirmar o *no* para cancelar."
-        ].join("\n")
-      });
+      await enviarConfirmacionPedido(chatId, pedido, texto.trim());
       return;
     }
 
@@ -698,13 +747,34 @@ async function iniciarBot() {
       pedidosEnCurso.set(chatId, { estado: "orden" });
       await sock.sendMessage(chatId, {
         text: [
-          "¡Claro! Para hacer tu pedido, envía:",
-          "1. Indica cuántas órdenes de 6 o 12 alitas deseas.",
-          "2. Puedes elegir una salsa o combinar: por ejemplo, *6 buffalo y 6 barbacoa*.",
-          "3. Acompañamiento papas aderezo.",
-          
+          "🛒 *Comencemos tu pedido*",
+          "",
+          "Selecciona una opción del menú o escribe directamente cuántas órdenes deseas.",
           "Ejemplo: *2 órdenes de 6 alitas y 1 orden de 12 alitas*."
         ].join("\n")
+      });
+      await sock.sendMessage(chatId, {
+        title: "Elige tu producto",
+        text: "Selecciona una opción para comenzar:",
+        footer: "Papas incluidas",
+        buttonText: "Ver productos",
+        sections: [
+          {
+            title: "Productos",
+            rows: [
+              {
+                title: "6 alitas con papas",
+                description: "L 190 por orden",
+                rowId: "orden_6"
+              },
+              {
+                title: "12 alitas con papas",
+                description: "L 310 por orden",
+                rowId: "orden_12"
+              }
+            ]
+          }
+        ]
       });
       return;
     }
