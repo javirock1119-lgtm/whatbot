@@ -82,15 +82,15 @@ function obtenerDesglosePedido(orden) {
   };
 
   let ordenesDeSeis = extraerCantidad(
-    /(\d+)?\s*(?:órdenes?\s*(?:de\s*)?)?(?:combo\s+six|6\s+alitas)/gi
+    /(?:^|[^\d])(?:(\d+)\s*(?:órdenes?|combos?)?\s*(?:de\s*)?)?(?:combo\s+six|6\s+alitas)(?=$|[^\d])/gi
   );
   let ordenesDeDoce = extraerCantidad(
-    /(\d+)?\s*(?:órdenes?\s*(?:de\s*)?)?(?:combo\s+big|12\s+alitas)/gi
+    /(?:^|[^\d])(?:(\d+)\s*(?:órdenes?|combos?)?\s*(?:de\s*)?)?(?:combo\s+big|12\s+alitas)(?=$|[^\d])/gi
   );
 
   if (ordenesDeSeis === 0 && ordenesDeDoce === 0) {
-    ordenesDeSeis = (textoOrden.match(/\b6\b/g) || []).length;
-    ordenesDeDoce = (textoOrden.match(/\b12\b/g) || []).length;
+    ordenesDeSeis = (textoOrden.match(/\b6\s+alitas\b/g) || []).length;
+    ordenesDeDoce = (textoOrden.match(/\b12\s+alitas\b/g) || []).length;
   }
 
   return {
