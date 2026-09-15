@@ -8,7 +8,9 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "20"
+      - key: MONGODB_URI
+        sync: false
     disk:
       name: whatsapp-session
-      mountPath: /opt/render/project/src/sesion
+      mountPath: /var/data/sesion
       sizeGB: 1

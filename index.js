@@ -4,11 +4,15 @@ import path from "path";
 import makeWASocket, {
     Browsers,
     DisconnectReason,
+    initAuthCreds,
+    BufferJSON,
+    proto,
     useMultiFileAuthState
 } from "@whiskeysockets/baileys";
 import qrcode from "qrcode-terminal";
 import QRCode from "qrcode";
 import pino from "pino";
+import { MongoClient } from "mongodb";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -31,7 +35,96 @@ app.listen(port, () => {
 });
 
 const logger = pino({ level: "silent" });
-const AUTH_PATH = path.join(process.cwd(), "sesion");
+const mongoClient = process.env.MONGODB_URI
+  ? new MongoClient(process.env.MONGODB_URI)
+  : null;
+
+if (mongoClient) {
+  await mongoClient.connect();
+  const mongoDB = mongoClient.db("bot-whatsapp");
+  const authCollection = mongoDB.collection("baileys_auth");
+  console.log("MongoDB conectado correctamente.");
+  globalThis.__botAuthCollection = authCollection;
+}
+
+async function guardarDatoMongo(clave, valor) {
+  if (!mongoClient) return;
+  const authCollection = globalThis.__botAuthCollection;
+  await authCollection.updateOne(
+    { clave },
+    { $set: { valor } },
+    { upsert: true }
+  );
+}
+
+async function leerDatoMongo(clave) {
+  if (!mongoClient) return null;
+  const authCollection = globalThis.__botAuthCollection;
+  const documento = await authCollection.findOne({ clave });
+  return documento ? documento.valor : null;
+}
+async function useMongoDBAuthState() {
+  const authCollection = globalThis.__botAuthCollection;
+  const credsGuardadas = await leerDatoMongo("creds");
+
+  const creds = credsGuardadas
+    ? JSON.parse(JSON.stringify(credsGuardadas, BufferJSON.reviver))
+    : initAuthCreds();
+
+  const keys = {};
+
+  const state = {
+    creds,
+    keys: {
+      get: async (type, ids) => {
+        const resultado = {};
+
+        for (const id of ids) {
+          const clave = `key-${type}-${id}`;
+          const dato = await leerDatoMongo(clave);
+
+          if (dato) {
+            resultado[id] = JSON.parse(
+              JSON.stringify(dato, BufferJSON.reviver)
+            );
+          }
+        }
+
+        return resultado;
+      },
+
+      set: async (data) => {
+        for (const type of Object.keys(data)) {
+          for (const id of Object.keys(data[type])) {
+            const clave = `key-${type}-${id}`;
+            const valor = data[type][id];
+
+            if (valor) {
+              await guardarDatoMongo(
+                clave,
+                JSON.parse(JSON.stringify(valor, BufferJSON.replacer))
+              );
+            } else {
+              await authCollection.deleteOne({ clave });
+            }
+          }
+        }
+      }
+    }
+  };
+
+  const saveCreds = async () => {
+    await guardarDatoMongo(
+      "creds",
+      JSON.parse(JSON.stringify(creds, BufferJSON.replacer))
+    );
+  };
+
+  return { state, saveCreds };
+}
+const AUTH_PATH = process.env.RENDER
+  ? "/var/data/sesion"
+  : path.join(process.cwd(), "sesion");
 const LOCK_PATH = path.join(process.cwd(), ".bot.lock");
 let socketActivo;
 let reconexionProgramada = false;
@@ -180,6 +273,7 @@ async function limpiarSesionCorrupta() {
 }
 
 async function iniciarBot() {
+  console.log("ENTRANDO A INICIAR BOT");
   await fs.promises.mkdir(AUTH_PATH, { recursive: true });
 
   if (socketActivo && socketActivo.ws?.readyState === 1) {
@@ -206,7 +300,9 @@ async function iniciarBot() {
     });
   }
 
-  const { state, saveCreds } = await useMultiFileAuthState(AUTH_PATH);
+  const { state, saveCreds } = process.env.MONGODB_URI
+    ? await useMongoDBAuthState()
+    : await useMultiFileAuthState(AUTH_PATH);
 
   const sock = makeWASocket({
     auth: state,
