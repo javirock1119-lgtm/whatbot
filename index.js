@@ -356,13 +356,22 @@ async function iniciarBot() {
       mensaje.message.ephemeralMessage?.message ||
       mensaje.message.viewOnceMessage?.message ||
       mensaje.message;
-    const texto =
+    const respuestaInteractiva =
+      contenido.listResponseMessage?.singleSelectReply?.selectedRowId ||
+      contenido.buttonsResponseMessage?.selectedButtonId ||
+      "";
+    const textoRecibido =
       contenido.conversation ||
       contenido.extendedTextMessage?.text ||
       contenido.imageMessage?.caption ||
       contenido.videoMessage?.caption ||
-      "";
-
+      respuestaInteractiva;
+    const texto = {
+      orden_6: "6 alitas",
+      orden_12: "12 alitas",
+      ver_info: "info",
+      iniciar_pedido: "ayuda"
+    }[textoRecibido.trim().toLowerCase()] || textoRecibido;
     const comando = texto.trim().toLowerCase();
     console.log(`Texto recibido: "${texto}"`);
 
@@ -633,6 +642,43 @@ async function iniciarBot() {
           text: menuText
         });
       }
+
+      await sock.sendMessage(chatId, {
+        title: "Elige una opción",
+        text: "Selecciona una opción para continuar:",
+        footer: "Hootswing Cocinas Legendarias",
+        buttonText: "Ver opciones",
+        sections: [
+          {
+            title: "Realizar pedido",
+            rows: [
+              {
+                title: "6 alitas con papas",
+                description: "L 190 por orden",
+                rowId: "orden_6"
+              },
+              {
+                title: "12 alitas con papas",
+                description: "L 310 por orden",
+                rowId: "orden_12"
+              }
+            ]
+          },
+          {
+            title: "Ayuda",
+            rows: [
+              {
+                title: "Información y horarios",
+                rowId: "ver_info"
+              },
+              {
+                title: "Iniciar pedido",
+                rowId: "iniciar_pedido"
+              }
+            ]
+          }
+        ]
+      });
       return;
     }
 
