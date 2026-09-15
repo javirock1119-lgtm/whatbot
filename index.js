@@ -299,15 +299,22 @@ async function iniciarBot() {
 
   const mensajesProcesados = new Set();
 
-  function enviarCuriosidadAleatoria(chatId, nombreCliente) {
+  async function enviarCuriosidadAleatoria(chatId, nombreCliente) {
     const curiosidad = curiosidades[Math.floor(Math.random() * curiosidades.length)];
-    sock.sendMessage(chatId, {
+    const mensaje = {
       text: [
         `💡 Aquí tienes un dato curioso mientras se cocina tu pedido, ${nombreCliente || "amigo"}:`,
         "",
         curiosidad
       ].join("\n")
-    }).catch(() => {});
+    };
+
+    try {
+      await sock.sendMessage(chatId, mensaje);
+      console.log(`Dato curioso enviado a ${chatId}.`);
+    } catch (error) {
+      console.error(`No se pudo enviar el dato curioso a ${chatId}:`, error);
+    }
   }
 
   function iniciarCuriosidadesAutomatica(chatId, nombreCliente) {
@@ -315,12 +322,14 @@ async function iniciarBot() {
       clearTimeout(curiosidadesTimers.get(chatId));
     }
 
-    const timer = setTimeout(() => {
-      enviarCuriosidadAleatoria(chatId, nombreCliente);
+    const timer = setTimeout(async () => {
+      console.log(`Enviando dato curioso a ${chatId} después de 3 minutos.`);
+      await enviarCuriosidadAleatoria(chatId, nombreCliente);
       curiosidadesTimers.delete(chatId);
     }, 3 * 60 * 1000);
 
     curiosidadesTimers.set(chatId, timer);
+    console.log(`Dato curioso programado para ${chatId} dentro de 3 minutos.`);
   }
 
   async function procesarMensaje(mensaje) {
