@@ -82,10 +82,10 @@ function obtenerDesglosePedido(orden) {
   };
 
   let ordenesDeSeis = extraerCantidad(
-    /(?:^|[^\d])(?:(\d+)\s*(?:órdenes?|combos?)?\s*(?:de\s*)?)?(?:combo\s+six|6\s+alitas)(?=$|[^\d])/gi
+    /(?:^|[^\d])(?:(\d+)\s*órdenes?\s*(?:de\s*)?)?6\s+alitas(?=$|[^\d])/gi
   );
   let ordenesDeDoce = extraerCantidad(
-    /(?:^|[^\d])(?:(\d+)\s*(?:órdenes?|combos?)?\s*(?:de\s*)?)?(?:combo\s+big|12\s+alitas)(?=$|[^\d])/gi
+    /(?:^|[^\d])(?:(\d+)\s*órdenes?\s*(?:de\s*)?)?12\s+alitas(?=$|[^\d])/gi
   );
 
   if (ordenesDeSeis === 0 && ordenesDeDoce === 0) {
@@ -386,11 +386,11 @@ async function iniciarBot() {
 
     if (pedido?.estado === "orden" && texto.trim()) {
       const orden = texto.trim();
-      const tieneOrdenValida = /\b(6|12|six|big)\b/i.test(orden);
+      const tieneOrdenValida = /\b(6|12)\s+alitas\b/i.test(orden);
 
       if (!tieneOrdenValida) {
         await sock.sendMessage(chatId, {
-          text: "Indica un combo válido: *Combo Six* o *Combo Big*."
+          text: "Indica una orden válida: *6 alitas* o *12 alitas*."
         });
         return;
       }
