@@ -613,6 +613,7 @@ async function iniciarBot() {
       ].join("\n");
 
       const posiblesRutas = [
+        path.join(process.cwd(), "img", "alitas.jpg"),
         path.join(process.cwd(), "img", "menu.jpg"),
         path.join(process.cwd(), "img", "menu.jpeg"),
         path.join(process.cwd(), "img", "menu.png")
