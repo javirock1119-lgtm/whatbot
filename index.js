@@ -71,22 +71,56 @@ const curiosidades = [
 ];
 const curiosidadesTimers = new Map();
 
-function obtenerTotalPedido(orden) {
+function obtenerDesglosePedido(orden) {
   const textoOrden = orden.toLowerCase().replace(/\s+/g, " ");
-  const combos = textoOrden.match(/\bcombo\s+(six|big)\b/g) || [];
+  const extraerCantidad = (patron) => {
+    const cantidades = [];
+    for (const coincidencia of textoOrden.matchAll(patron)) {
+      cantidades.push(Number(coincidencia[1] || 1));
+    }
+    return cantidades.reduce((total, cantidad) => total + cantidad, 0);
+  };
 
-  if (combos.length > 0) {
-    return combos.reduce(
-      (total, combo) => total + (combo.endsWith("big") ? 310 : 190),
-      0
+  let ordenesDeSeis = extraerCantidad(
+    /(\d+)?\s*(?:órdenes?\s*(?:de\s*)?)?(?:combo\s+six|6\s+alitas)/gi
+  );
+  let ordenesDeDoce = extraerCantidad(
+    /(\d+)?\s*(?:órdenes?\s*(?:de\s*)?)?(?:combo\s+big|12\s+alitas)/gi
+  );
+
+  if (ordenesDeSeis === 0 && ordenesDeDoce === 0) {
+    ordenesDeSeis = (textoOrden.match(/\b6\b/g) || []).length;
+    ordenesDeDoce = (textoOrden.match(/\b12\b/g) || []).length;
+  }
+
+  return {
+    ordenesDeSeis,
+    ordenesDeDoce,
+    total: ordenesDeSeis * 190 + ordenesDeDoce * 310
+  };
+}
+
+function obtenerTotalPedido(orden) {
+  return obtenerDesglosePedido(orden).total;
+}
+
+function obtenerResumenPedido(orden, total) {
+  const desglose = obtenerDesglosePedido(orden);
+  const lineas = ["🍗 Resumen de tu pedido"];
+
+  if (desglose.ordenesDeSeis > 0) {
+    lineas.push(
+      `* ${desglose.ordenesDeSeis} ${desglose.ordenesDeSeis === 1 ? "orden" : "órdenes"} de 6 alitas = L ${desglose.ordenesDeSeis * 190}`
+    );
+  }
+  if (desglose.ordenesDeDoce > 0) {
+    lineas.push(
+      `* ${desglose.ordenesDeDoce} ${desglose.ordenesDeDoce === 1 ? "orden" : "órdenes"} de 12 alitas = L ${desglose.ordenesDeDoce * 310}`
     );
   }
 
-  const cantidades = textoOrden.match(/\b(6|12)\b/g) || [];
-  return cantidades.reduce(
-    (total, cantidad) => total + (cantidad === "12" ? 310 : 190),
-    0
-  );
+  lineas.push(`💰 Total a pagar: L ${total}`);
+  return lineas.join("\n");
 }
 
 async function obtenerLockDeArranque() {
@@ -336,8 +370,8 @@ async function iniciarBot() {
           "",
           "*MENÚ - HOOTSWING COCINAS LEGENDARIAS* 🍗",
           "",
-          "🍗 Combo Six: 6 alitas, papas y aderezo - 190 LPS",
-          "🍗 Combo Big: 12 alitas, papas y aderezo - 310 LPS",
+          "🍗 6 alitas con papas - L 190",
+          "🍗 12 alitas con papas - L 310",
           "",
           "Salsas: barbacoa y buffalo.",
           "Acompañamientos: papas, aderezos.",
@@ -362,6 +396,7 @@ async function iniciarBot() {
       }
 
       const total = obtenerTotalPedido(orden);
+      const resumen = obtenerResumenPedido(orden, total);
       const salsasEnOrden = [];
       if (orden.toLowerCase().includes("barbacoa")) {
         salsasEnOrden.push("barbacoa");
@@ -375,6 +410,7 @@ async function iniciarBot() {
           estado: "nombre",
           orden,
           total,
+          resumen,
           salsa: salsasEnOrden.join(" y ")
         });
         await sock.sendMessage(chatId, {
@@ -386,7 +422,8 @@ async function iniciarBot() {
       pedidosEnCurso.set(chatId, {
         estado: "salsa",
         orden,
-        total
+        total,
+        resumen
       });
       await sock.sendMessage(chatId, {
         text: "¿Qué salsa deseas? Responde *barbacoa* o *buffalo*."
@@ -413,6 +450,7 @@ async function iniciarBot() {
         estado: "nombre",
         orden: pedido.orden,
         total: pedido.total,
+        resumen: pedido.resumen,
         salsa: salsaElegida
       });
       await sock.sendMessage(chatId, {
@@ -426,6 +464,7 @@ async function iniciarBot() {
         estado: "direccion",
         orden: pedido.orden,
         total: pedido.total,
+        resumen: pedido.resumen,
         salsa: pedido.salsa,
         nombre: texto.trim()
       });
@@ -440,6 +479,7 @@ async function iniciarBot() {
         estado: "confirmacion",
         orden: pedido.orden,
         total: pedido.total,
+        resumen: pedido.resumen,
         salsa: pedido.salsa,
         nombre: pedido.nombre,
         direccion: texto.trim()
@@ -447,13 +487,12 @@ async function iniciarBot() {
       await sock.sendMessage(chatId, {
         text: [
           "¡Perfecto! Revisa tus datos:",
-          `Orden: ${pedido.orden}`,
-          `Total del pedido: ${pedido.total ?? obtenerTotalPedido(pedido.orden)} LPS`,
+          pedido.resumen,
           `Salsa: ${pedido.salsa}`,
           `Nombre: ${pedido.nombre}`,
           `Dirección: ${texto.trim()}`,
           "",
-          "¿Confirmas tu pedido?",
+          "¿Deseas confirmar tu pedido?",
           "Responde *si* para confirmar o *no* para cancelar."
         ].join("\n")
       });
@@ -466,8 +505,7 @@ async function iniciarBot() {
         await sock.sendMessage(chatId, {
           text: [
             "¡Pedido confirmado! ✅",
-            `Orden: ${pedido.orden}`,
-            `Total del pedido: ${pedido.total ?? obtenerTotalPedido(pedido.orden)} LPS`,
+            pedido.resumen,
             `Salsa: ${pedido.salsa}`,
             `Nombre: ${pedido.nombre}`,
             `Dirección: ${pedido.direccion}`,
@@ -555,8 +593,8 @@ async function iniciarBot() {
       const menuText = [
         "*MENÚ - HOOTSWING COCINAS LEGENDARIAS* 🍗",
         "",
-        "🍗 Combo Six: 6 alitas, papas y aderezo - 190 LPS",
-        "🍗 Combo Big: 12 alitas, papas y aderezo - 310 LPS",
+        "🍗 6 alitas con papas - L 190",
+        "🍗 12 alitas con papas - L 310",
         "",
         "Salsas: barbacoa y buffalo.",
         "Acompañamientos: papas, aderezos.",
@@ -605,11 +643,11 @@ async function iniciarBot() {
       await sock.sendMessage(chatId, {
         text: [
           "¡Claro! Para hacer tu pedido, envía:",
-          "1. Elige Combo Six o Combo Big.",
+          "1. Indica cuántas órdenes de 6 o 12 alitas deseas.",
           "2. Puedes elegir una salsa o combinar: por ejemplo, *6 buffalo y 6 barbacoa*.",
           "3. Acompañamiento papas aderezo.",
           
-          "Para comenzar, escribe *Combo Six* o *Combo Big*. También puedes indicar varias salsas."
+          "Ejemplo: *2 órdenes de 6 alitas y 1 orden de 12 alitas*."
         ].join("\n")
       });
       return;
@@ -617,7 +655,7 @@ async function iniciarBot() {
 
     if (comando) {
       await sock.sendMessage(chatId, {
-        text: "¡Bienvenido a *Hootswing Cocinas Legendarias*! 🍗 Escribe *menu* para ver Combo Six y Combo Big, o *ayuda* para hacer tu pedido."
+        text: "¡Bienvenido a *Hootswing Cocinas Legendarias*! 🍗 Escribe *menu* para ver nuestras opciones, o *ayuda* para hacer tu pedido."
       });
     }
   }
