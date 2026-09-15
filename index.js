@@ -82,10 +82,10 @@ function obtenerDesglosePedido(orden) {
   };
 
   let ordenesDeSeis = extraerCantidad(
-    /(?:^|[^\d])(?:(\d+)\s*órdenes?\s*(?:de\s*)?)?6\s+alitas(?=$|[^\d])/gi
+    /(?:^|[^\d])(?:(\d+)\s*(?:(?:órdenes?|ordenes?)\s*)?(?:de\s*)?)?6\s+alitas(?=$|[^\d])/gi
   );
   let ordenesDeDoce = extraerCantidad(
-    /(?:^|[^\d])(?:(\d+)\s*órdenes?\s*(?:de\s*)?)?12\s+alitas(?=$|[^\d])/gi
+    /(?:^|[^\d])(?:(\d+)\s*(?:(?:órdenes?|ordenes?)\s*)?(?:de\s*)?)?12\s+alitas(?=$|[^\d])/gi
   );
 
   if (ordenesDeSeis === 0 && ordenesDeDoce === 0) {
