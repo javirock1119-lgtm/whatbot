@@ -7,7 +7,45 @@ Bot básico hecho con Node.js y Baileys. Responde a `hola`, `menu`, `info` y `ay
 - Node.js 20 o superior
 - Un teléfono con WhatsApp
 
-## Instalación
+## Instalación en Linux
+
+En la laptop Linux que funcionará como servidor:
+
+```bash
+sudo apt update
+sudo apt install -y nodejs npm
+node --version
+npm --version
+```
+
+Node.js 20 o superior es recomendado. Después clona e inicia el bot:
+
+```bash
+git clone https://github.com/javirock1119-lgtm/whatbot.git
+cd whatbot
+npm ci
+mkdir -p /opt/whatbot-data
+BOT_DATA_PATH=/opt/whatbot-data npm start
+```
+
+La variable `BOT_DATA_PATH` conserva la sesión y el QR fuera del código. También
+puedes definirla permanentemente con un archivo `.env` gestionado por tu servicio
+de Linux. No subas ese archivo a GitHub si contiene `MONGODB_URI`.
+
+El servidor HTTP escucha en todas las interfaces en el puerto `3000`. Desde otro
+dispositivo de la misma red abre:
+
+```text
+http://IP-DE-LA-LAPTOP:3000/qr.png
+```
+
+Si utilizas UFW, permite el puerto:
+
+```bash
+sudo ufw allow 3000/tcp
+```
+
+## Instalación en Windows
 
 Abre PowerShell en esta carpeta y ejecuta:
 

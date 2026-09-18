@@ -1,5 +1,6 @@
 node_modules/
 sesion/
+sesion-respaldo-qr/
 qr.png
 .bot.lock
 bot.log

@@ -16,7 +16,10 @@ import { MongoClient } from "mongodb";
 
 const app = express();
 const port = process.env.PORT || 3000;
-const qrImagePath = path.join(process.cwd(), "qr.png");
+const host = process.env.HOST || "0.0.0.0";
+const dataPath = process.env.BOT_DATA_PATH ||
+  (process.env.RENDER ? "/var/data" : process.cwd());
+const qrImagePath = path.join(dataPath, "qr.png");
 
 app.get('/', (req, res) => {
   res.send('Bot de WhatsApp activo 24/7');
@@ -30,13 +33,18 @@ app.get("/qr.png", (req, res) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`Servidor HTTP corriendo en el puerto ${port}`);
+app.listen(port, host, () => {
+  console.log(`Servidor HTTP corriendo en http://${host}:${port}`);
 });
 
 const logger = pino({ level: "silent" });
 const mongoClient = process.env.MONGODB_URI
-  ? new MongoClient(process.env.MONGODB_URI)
+  ? new MongoClient(process.env.MONGODB_URI, {
+      maxPoolSize: 3,
+      minPoolSize: 0,
+      maxIdleTimeMS: 30000,
+      serverSelectionTimeoutMS: 10000
+    })
   : null;
 
 if (mongoClient) {
@@ -122,14 +130,41 @@ async function useMongoDBAuthState() {
 
   return { state, saveCreds };
 }
-const AUTH_PATH = process.env.RENDER
-  ? "/var/data/sesion"
-  : path.join(process.cwd(), "sesion");
-const LOCK_PATH = path.join(process.cwd(), ".bot.lock");
+const AUTH_PATH = process.env.AUTH_PATH || path.join(dataPath, "sesion");
+const LOCK_PATH = path.join(dataPath, ".bot.lock");
 let socketActivo;
 let reconexionProgramada = false;
 let lockAdquiridoPorEsteProceso = false;
 const pedidosEnCurso = new Map();
+const pedidoTTLConfigurado = Number.parseInt(
+  process.env.PEDIDO_TTL_MS || String(2 * 60 * 60 * 1000),
+  10
+);
+const pedidoTTL = Number.isFinite(pedidoTTLConfigurado) && pedidoTTLConfigurado > 0
+  ? pedidoTTLConfigurado
+  : 2 * 60 * 60 * 1000;
+const limpiarPedidosTimer = setInterval(() => {
+  const limite = Date.now() - pedidoTTL;
+  for (const [chatId, pedido] of pedidosEnCurso) {
+    if (pedido.actualizadoEn < limite) {
+      pedidosEnCurso.delete(chatId);
+      const timer = curiosidadesTimers.get(chatId);
+      if (timer) {
+        clearTimeout(timer);
+        curiosidadesTimers.delete(chatId);
+      }
+    }
+  }
+}, 15 * 60 * 1000);
+limpiarPedidosTimer.unref();
+
+function guardarPedidoEnCurso(chatId, pedido) {
+  pedidosEnCurso.set(chatId, {
+    ...pedido,
+    actualizadoEn: Date.now()
+  });
+}
+
 const curiosidades = [
   "🌌 La luz del Sol tarda aproximadamente 8 minutos y 20 segundos en llegar a la Tierra.",
   "🧠 El cerebro humano utiliza cerca del 20% de la energía del cuerpo, aunque representa aproximadamente el 2% de su peso.",
@@ -326,7 +361,7 @@ async function iniciarBot() {
     if (qr) {
       await QRCode.toFile(qrImagePath, qr, {
         type: "png",
-        width: 720,
+        width: 512,
         margin: 4,
         errorCorrectionLevel: "M"
       });
@@ -582,7 +617,7 @@ async function iniciarBot() {
       }
 
       if (salsasEnOrden.length > 0) {
-        pedidosEnCurso.set(chatId, {
+        guardarPedidoEnCurso(chatId, {
           estado: "nombre",
           orden,
           total,
@@ -595,7 +630,7 @@ async function iniciarBot() {
         return;
       }
 
-      pedidosEnCurso.set(chatId, {
+      guardarPedidoEnCurso(chatId, {
         estado: "salsa",
         orden,
         total,
@@ -620,7 +655,7 @@ async function iniciarBot() {
         return;
       }
 
-      pedidosEnCurso.set(chatId, {
+      guardarPedidoEnCurso(chatId, {
         estado: "nombre",
         orden: pedido.orden,
         total: pedido.total,
@@ -634,7 +669,7 @@ async function iniciarBot() {
     }
 
     if (pedido?.estado === "nombre" && texto.trim()) {
-      pedidosEnCurso.set(chatId, {
+      guardarPedidoEnCurso(chatId, {
         estado: "direccion",
         orden: pedido.orden,
         total: pedido.total,
@@ -649,7 +684,7 @@ async function iniciarBot() {
     }
 
     if (pedido?.estado === "direccion" && texto.trim()) {
-      pedidosEnCurso.set(chatId, {
+      guardarPedidoEnCurso(chatId, {
         estado: "confirmacion",
         orden: pedido.orden,
         total: pedido.total,
@@ -840,7 +875,7 @@ async function iniciarBot() {
     }
 
     if (comando === "pedido listo" || comando === "ayuda" || comando === "quiero") {
-      pedidosEnCurso.set(chatId, { estado: "orden" });
+      guardarPedidoEnCurso(chatId, { estado: "orden" });
       await sock.sendMessage(chatId, {
         text: [
           "🛒 *Comencemos tu pedido*",
