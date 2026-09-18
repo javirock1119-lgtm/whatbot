@@ -26,6 +26,11 @@ app.get('/', (req, res) => {
 });
 
 app.get("/qr.png", (req, res) => {
+  res.set({
+    "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+    Pragma: "no-cache",
+    Expires: "0"
+  });
   res.sendFile(qrImagePath, (error) => {
     if (error && !res.headersSent) {
       res.status(error.code === "ENOENT" ? 404 : 500).send("QR no disponible");
